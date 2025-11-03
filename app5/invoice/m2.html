@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Rechnung – Meilenstein 2 (35%)</title>
+  <script src="../shared/dataStorage.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <style>
+    body{font-family:Arial,sans-serif;margin:20px}
+    .box{background:#f3f3f3;padding:10px;margin:10px 0}
+    button{padding:8px 12px}
+  </style>
+</head>
+<body>
+  <h1>🧾 Rechnung – Meilenstein 2 (35%)</h1>
+  <button onclick="history.back()">← Zurück</button>
+
+  <div id="info" class="box"></div>
+  <button id="create">Rechnung erzeugen</button>
+
+  <script>
+    const q = new URLSearchParams(location.search);
+    const cid = q.get('cid'); const oid = q.get('oid');
+
+    const customers = getCustomers();
+    const c = customers.find(x => x.id === cid);
+    const offer = c?.offers?.find(o => o.id === oid);
+    if(!c || !offer){ alert("Kunde/Angebot nicht gefunden."); location.href="../crm/customers.html"; }
+
+    const amount = Math.round(Number(offer.preis||0) * 0.35); // 35 %
+    document.getElementById('info').innerText =
+      `Kunde: ${c.firstName} ${c.lastName} • Angebot: ${offer.id} (${offer.paket}) • Gesamtpreis: ${offer.preis} € • Meilenstein 2 (35%): ${amount} €`;
+
+    document.getElementById('create').onclick = ()=>{
+      const inv = addInvoiceToCustomer(c.id, {
+        offerId: offer.id,
+        title: `Meilenstein 2 (35%) – ${offer.paket}`,
+        amount: amount,
+        note: `Bezug: Angebot ${offer.id}. Zahlungsziel: 7 Tage.`
+      });
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      doc.setFont("helvetica","bold"); doc.setFontSize(18);
+      doc.text("RECHNUNG", 105, 20, {align:"center"});
+
+      doc.setFont("helvetica","normal"); doc.setFontSize(11);
+      doc.text(`Rechnungs-Nr.: ${inv.number}`, 20, 35);
+      doc.text(`Datum: ${new Date().toLocaleDateString("de-DE")}`, 20, 42);
+
+      doc.setFont("helvetica","bold"); doc.text("Absender:", 20, 55);
+      doc.setFont("helvetica","normal");
+      doc.text("Dein Firmenname\nDeine Straße 1\n12345 Dein Ort\ninfo@deinefirma.de", 20, 62);
+
+      doc.setFont("helvetica","bold"); doc.text("Empfänger:", 120, 55);
+      doc.setFont("helvetica","normal");
+      doc.text(`${c.firstName} ${c.lastName}\n${c.email}`, 120, 62);
+
+      doc.setFont("helvetica","bold"); doc.text("Leistung", 20, 95);
+      doc.text("Betrag (€)", 170, 95, {align:"right"});
+      doc.setFont("helvetica","normal");
+      doc.text(`Meilenstein 2 (35%) – ${offer.paket} (Bezug: Angebot ${offer.id})`, 20, 105);
+      doc.text(String(amount), 170, 105, {align:"right"});
+
+      doc.setFont("helvetica","bold");
+      doc.text("Gesamt:", 20, 125);
+      doc.text(String(amount)+" €", 170, 125, {align:"right"});
+
+      doc.setFont("helvetica","normal");
+      doc.text("Zahlungsziel: 7 Tage. Vielen Dank!", 20, 145);
+
+      doc.save(`Rechnung_${inv.number}.pdf`);
+      alert(`Rechnung erstellt: ${inv.number}`);
+      location.href="../crm/customers.html";
+    };
+  </script>
+</body>
+</html>

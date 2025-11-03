@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"><title>Abo unterschreiben</title>
+  <script src="../shared/dataStorage.js"></script>
+  <style>
+    body{font-family:Arial,sans-serif;margin:20px}
+    #pad{border:1px solid #ccc;touch-action:none}
+    .row{margin:10px 0}
+  </style>
+</head>
+<body>
+  <h1>✍️ Abo-Vertrag unterschreiben</h1>
+  <div id="info"></div>
+  <div class="row"><canvas id="pad" width="600" height="200"></canvas></div>
+  <div class="row">
+    <button id="clear">Löschen</button>
+    <button id="save">Unterschrift speichern</button>
+  </div>
+
+<script>
+  const q=new URLSearchParams(location.search);
+  const cid=q.get('cid'), sid=q.get('sid');
+  const c=getCustomers().find(x=>x.id===cid);
+  const s=(c?.subscriptions||[]).find(x=>x.id===sid);
+  if(!c || !s){ alert("Daten nicht gefunden."); location.href="../crm/customers.html"; }
+
+  document.getElementById('info').innerText =
+    `Kunde: ${c.firstName} ${c.lastName} • Abo: ${s.title} • Betrag: ${s.amount} € / Monat • Start: ${s.nextDue}`;
+
+  // simples Signatur-Pad
+  const pad=document.getElementById('pad'), ctx=pad.getContext('2d');
+  ctx.lineWidth=2; ctx.lineCap='round';
+  let draw=false, prev=null;
+  const P=e=>{ const r=pad.getBoundingClientRect(); const t=e.touches?.[0]||e; return {x:t.clientX-r.left, y:t.clientY-r.top}; }
+  pad.addEventListener('mousedown',e=>{draw=true; prev=P(e);});
+  pad.addEventListener('mousemove',e=>{ if(!draw) return; const p=P(e); ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(p.x,p.y); ctx.stroke(); prev=p;});
+  window.addEventListener('mouseup',()=>{draw=false; prev=null;});
+  pad.addEventListener('touchstart',e=>{e.preventDefault(); draw=true; prev=P(e);});
+  pad.addEventListener('touchmove', e=>{e.preventDefault(); if(!draw) return; const p=P(e); ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(p.x,p.y); ctx.stroke(); prev=p;});
+  pad.addEventListener('touchend',  e=>{e.preventDefault(); draw=false; prev=null;});
+  document.getElementById('clear').onclick=()=>ctx.clearRect(0,0,pad.width,pad.height);
+
+  document.getElementById('save').onclick=()=>{
+    const dataUrl = pad.toDataURL("image/png");
+    setSubscriptionAccepted(c.id, s.id, dataUrl);
+    alert("Abo unterschrieben und aktiviert.");
+    location.href="../crm/customers.html";
+  };
+</script>
+</body>
+</html>

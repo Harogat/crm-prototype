@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Projekte – Kunde</title>
+    <script src="../shared/dataStorage.js"></script>
+    <style>
+        :root {
+            --line: #e5e7eb;
+            --muted: #6b7280;
+            --card: #fff;
+            --brand: #2563eb
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: system-ui, Segoe UI, Roboto, Arial;
+            margin: 20px;
+            color: #111827
+        }
+
+        h1 {
+            margin: 0 0 8px
+        }
+
+        .muted {
+            color: var(--muted)
+        }
+
+        .btn {
+            appearance: none;
+            border: 1px solid var(--line);
+            background: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer
+        }
+
+        .btn.primary {
+            background: var(--brand);
+            color: #fff;
+            border-color: var(--brand)
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 14px
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 12px;
+            margin-top: 12px
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px
+        }
+
+        th,
+        td {
+            border-bottom: 1px solid var(--line);
+            padding: 8px;
+            text-align: left;
+            font-size: 14px
+        }
+
+        th {
+            font-weight: 600
+        }
+
+        .right {
+            text-align: right
+        }
+
+        .small {
+            font-size: 12px
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            font-size: 12px
+        }
+
+        .ok {
+            background: #ecfdf5;
+            color: #065f46;
+            border-color: #d1fae5
+        }
+
+        .hold {
+            background: #fffbeb;
+            color: #92400e;
+            border-color: #fde68a
+        }
+
+        .done {
+            background: #eef2ff;
+            color: #3730a3;
+            border-color: #e5e7eb
+        }
+
+        .input,
+        .select,
+        textarea {
+            padding: 8px;
+            border: 1px solid var(--line);
+            border-radius: 8px
+        }
+    </style>
+</head>
+
+<body>
+    <button class="btn" onclick="history.back()">← Zurück</button>
+    <h1 id="title">Projekte</h1>
+
+    <div class="row" style="margin:8px 0 12px">
+        <button class="btn primary" id="btnNew">➕ Projekt anlegen</button>
+        <select id="fromOffer" class="select">
+            <option value="">…aus Angebot anlegen</option>
+        </select>
+    </div>
+
+    <div id="wrap" class="grid"></div>
+
+    <!-- Dialog sehr simpel -->
+    <div id="dlg" class="card"
+        style="display:none;position:fixed;inset:auto 20px 20px 20px;z-index:10;box-shadow:0 10px 30px rgba(0,0,0,.12)">
+        <h3 style="margin:0 0 8px">Projekt anlegen</h3>
+        <div style="display:grid;gap:8px">
+            <input id="pTitle" class="input" placeholder="Titel">
+            <textarea id="pNotes" rows="3" placeholder="Notizen"></textarea>
+        </div>
+        <div class="row" style="margin-top:10px">
+            <button class="btn primary" id="dlgOk">Speichern</button>
+            <button class="btn" id="dlgCancel">Abbrechen</button>
+        </div>
+    </div>
+
+    <script>
+        const q = new URLSearchParams(location.search);
+        const cid = q.get("cid");
+        let c = getCustomers().find(x => x.id === cid);
+        if (!c) { alert("Kunde nicht gefunden."); location.href = "./customers.html"; }
+
+        const title = document.getElementById('title');
+        title.textContent = `Projekte – ${c.firstName || ''} ${c.lastName || ''} • ${c.email || ''}`;
+
+        // Angebote in Dropdown
+        (function fillOffers() {
+            const sel = document.getElementById('fromOffer');
+            (c.offers || []).forEach(o => {
+                const opt = document.createElement('option');
+                opt.value = o.id;
+                opt.textContent = `${o.id} • ${o.paket || '-'} (${o.status || 'erstellt'})`;
+                sel.appendChild(opt);
+            });
+            sel.addEventListener('change', () => {
+                const oid = sel.value;
+                if (!oid) return;
+                const p = addProjectFromOffer(c.id, oid);
+                refresh();
+                sel.value = '';
+            });
+        })();
+
+        // neues Projekt (freihand)
+        const dlg = document.getElementById('dlg');
+        document.getElementById('btnNew').onclick = () => { dlg.style.display = 'block'; document.getElementById('pTitle').focus(); };
+        document.getElementById('dlgCancel').onclick = () => dlg.style.display = 'none';
+        document.getElementById('dlgOk').onclick = () => {
+            const title = (document.getElementById('pTitle').value || '').trim() || 'Neues Projekt';
+            const notes = (document.getElementById('pNotes').value || '').trim();
+            addProjectToCustomer(c.id, { title, notes });
+            dlg.style.display = 'none';
+            document.getElementById('pTitle').value = ''; document.getElementById('pNotes').value = '';
+            refresh();
+        };
+
+        function badge(status) {
+            if (status === 'done') return 'badge done';
+            if (status === 'onhold') return 'badge hold';
+            return 'badge ok';
+        }
+
+        function renderProjectCard(p) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+        <div class="row" style="justify-content:space-between">
+          <div><strong>${p.title}</strong> ${p.offerId ? `<span class="small muted">• aus Angebot ${p.offerId}</span>` : ''}</div>
+          <div><span class="${badge(p.status)}">${p.status}</span></div>
+        </div>
+
+        <div class="small muted" style="margin-top:4px">erstellt: ${new Date(p.createdAt).toLocaleString()}</div>
+
+        <h4 style="margin:12px 0 6px">Meilensteine</h4>
+        ${(p.milestones || []).length ? `
+          <table>
+            <thead><tr><th>Meilenstein</th><th>Fälligkeit</th><th>Status</th><th>Aktion</th></tr></thead>
+            <tbody>
+              ${p.milestones.map(m => `
+                <tr>
+                  <td>${m.title}</td>
+                  <td>${m.due || ''}</td>
+                  <td>${m.done ? '✅' : '–'}</td>
+                  <td>
+                    <button class="btn small" data-tgl="${p.id}:${m.id}">${m.done ? 'öffnen' : 'abhaken'}</button>
+                  </td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        ` : `<div class="muted">Keine Meilensteine.</div>`}
+
+        <div class="row" style="margin-top:8px">
+          <input class="input small" placeholder="Neuer Meilenstein" id="ms-${p.id}-title" />
+          <input class="input small" placeholder="YYYY-MM-DD" id="ms-${p.id}-due" style="width:150px"/>
+          <button class="btn small" data-addms="${p.id}">+ hinzufügen</button>
+        </div>
+
+        <h4 style="margin:12px 0 6px">Dateien / Links</h4>
+        ${(p.files || []).length ? `
+          <table>
+            <thead><tr><th>Name</th><th>Link</th><th>Hinzugefügt</th></tr></thead>
+            <tbody>
+              ${p.files.map(f => `
+                <tr>
+                  <td>${f.name}</td>
+                  <td>${f.url ? `<a href="${f.url}" target="_blank">öffnen</a>` : ''}</td>
+                  <td>${new Date(f.addedAt).toLocaleString()}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        ` : `<div class="muted">Noch keine Dateien/Links.</div>`}
+
+        <div class="row" style="margin-top:8px">
+          <input class="input small" placeholder="Dateiname/Linktitel" id="f-${p.id}-name"/>
+          <input class="input small" placeholder="https://… (Drive/Dropbox…)" id="f-${p.id}-url" style="flex:1"/>
+          <button class="btn small" data-addfile="${p.id}">+ Link speichern</button>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <select class="select small" id="st-${p.id}">
+            <option value="open" ${p.status === 'open' ? 'selected' : ''}>offen</option>
+            <option value="onhold" ${p.status === 'onhold' ? 'selected' : ''}>on hold</option>
+            <option value="done" ${p.status === 'done' ? 'selected' : ''}>abgeschlossen</option>
+          </select>
+          <button class="btn small" data-setstatus="${p.id}">Status speichern</button>
+        </div>
+      `;
+            return card;
+        }
+
+        function refresh() {
+            c = getCustomers().find(x => x.id === cid) || c; // rehydrate
+            const wrap = document.getElementById('wrap');
+            wrap.innerHTML = '';
+            const list = Array.isArray(c.projects) ? c.projects : [];
+            if (!list.length) {
+                wrap.innerHTML = `<div class="card muted">Noch keine Projekte. Lege eins an oder wähle ein Angebot oben.</div>`;
+                return;
+            }
+            list
+                .slice()
+                .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+                .forEach(p => wrap.appendChild(renderProjectCard(p)));
+        }
+        refresh();
+
+        // Delegation: Buttons in Karten
+        document.getElementById('wrap').addEventListener('click', (e) => {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+
+            // MS toggeln
+            if (btn.dataset.tgl) {
+                const [pid, mid] = btn.dataset.tgl.split(':');
+                const p = (c.projects || []).find(x => x.id === pid);
+                const m = (p?.milestones || []).find(x => x.id === mid);
+                if (m) { toggleMilestoneDone(c.id, pid, mid, !m.done); refresh(); }
+                return;
+            }
+            // MS hinzufügen
+            if (btn.dataset.addms) {
+                const pid = btn.dataset.addms;
+                const t = document.getElementById(`ms-${pid}-title`).value.trim();
+                const d = document.getElementById(`ms-${pid}-due`).value.trim();
+                if (!t) { alert('Bitte Titel für den Meilenstein eingeben.'); return; }
+                addProjectMilestone(c.id, pid, t, d);
+                refresh();
+                return;
+            }
+            // Datei/Link hinzufügen
+            if (btn.dataset.addfile) {
+                const pid = btn.dataset.addfile;
+                const name = document.getElementById(`f-${pid}-name`).value.trim() || 'Datei';
+                const url = document.getElementById(`f-${pid}-url`).value.trim();
+                addProjectFile(c.id, pid, { name, url });
+                refresh();
+                return;
+            }
+            // Status setzen
+            if (btn.dataset.setstatus) {
+                const pid = btn.dataset.setstatus;
+                const sel = document.getElementById(`st-${pid}`);
+                updateProject(c.id, pid, { status: sel.value });
+                refresh();
+                return;
+            }
+        });
+    </script>
+</body>
+
+</html>

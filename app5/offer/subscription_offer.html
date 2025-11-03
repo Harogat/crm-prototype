@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"><title>Abo-Angebot</title>
+  <script src="../shared/dataStorage.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <style>
+    body{font-family:Arial,sans-serif;margin:20px}
+    label{display:block;margin:8px 0}
+    input,select,button{padding:6px}
+    .box{background:#f3f3f3;padding:10px;margin:10px 0}
+  </style>
+</head>
+<body>
+  <h1>📄 Abo-Angebot</h1>
+  <button onclick="history.back()">← Zurück</button>
+  <div id="who" class="box"></div>
+
+  <form id="f">
+    <label>Leistungstitel:
+      <input name="title" value="SEO Betreuung" required>
+    </label>
+    <label>Monatsbetrag (€):
+      <input name="amount" type="number" min="1" step="1" value="400" required>
+    </label>
+    <label>Laufzeit (Monate):
+      <select name="duration">
+        <option>6</option><option selected>12</option><option>24</option>
+      </select>
+    </label>
+    <label>Startdatum:
+      <input name="start" type="date" required>
+    </label>
+    <button>PDF erzeugen & Abo anlegen</button>
+  </form>
+
+<script>
+  const q=new URLSearchParams(location.search);
+  const cid=q.get('cid');
+  const customers = getCustomers();
+  const c = customers.find(x=>x.id===cid);
+  if(!c){ alert("Kunde nicht gefunden."); location.href="../crm/customers.html"; }
+
+  document.getElementById('who').innerText =
+    `Kunde: ${c.firstName} ${c.lastName} • ${c.email}`;
+
+  document.getElementById('f').addEventListener('submit', e=>{
+    e.preventDefault();
+    const title = e.target.title.value.trim();
+    const amount = Number(e.target.amount.value||0);
+    const duration = Number(e.target.duration.value||12);
+    const start = e.target.start.value;
+
+    // 1) PDF-Angebot
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFont("helvetica","bold"); doc.setFontSize(18);
+    doc.text("ABO-ANGEBOT", 105, 20, {align:"center"});
+
+    doc.setFont("helvetica","normal"); doc.setFontSize(12);
+    doc.text(`Kunde: ${c.firstName} ${c.lastName}`, 20, 35);
+    doc.text(`E-Mail: ${c.email}`, 20, 42);
+    doc.text(`Datum: ${new Date().toLocaleDateString("de-DE")}`, 20, 49);
+    doc.text(`Leistung: ${title}`, 20, 65);
+    doc.text(`Monatsbetrag: ${amount} €`, 20, 72);
+    doc.text(`Laufzeit: ${duration} Monate`, 20, 79);
+    doc.text(`Start: ${start}`, 20, 86);
+    doc.text("Hinweis: Monatliche Abrechnung. Kündigungs-/Vertragsbedingungen nach Vereinbarung.",
+             20, 100, {maxWidth:170});
+    doc.save(`Abo_Angebot_${c.lastName}.pdf`);
+
+    // 2) Abo direkt AM KUNDEN speichern – aber noch NICHT aktiv
+    const sub = addSubscriptionToCustomer(c.id, {
+      title, amount, interval:'monthly', nextDue:start, active:false
+    });
+
+    // 3) Weiter zur Signaturseite
+    location.href = `subscription_sign.html?cid=${encodeURIComponent(c.id)}&sid=${encodeURIComponent(sub.id)}`;
+  });
+</script>
+</body>
+</html>

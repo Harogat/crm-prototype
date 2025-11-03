@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"><title>SEO-Abo anlegen</title>
+  <script src="../shared/dataStorage.js"></script>
+  <style>body{font-family:Arial,sans-serif;margin:20px} label{display:block;margin:8px 0}</style>
+</head>
+<body>
+  <h1>SEO-Abo anlegen</h1>
+  <button onclick="history.back()">← Zurück</button>
+  <div id="who" style="margin:10px 0; background:#f3f3f3; padding:10px"></div>
+
+  <form id="f">
+    <label>Titel: <input name="title" value="SEO Betreuung" required></label>
+    <label>Monatsbetrag (€): <input name="amount" type="number" min="1" step="1" value="400" required></label>
+    <label>Start (YYYY-MM-DD): <input name="start" type="date" required></label>
+    <button>Anlegen</button>
+  </form>
+
+  <script>
+    const q=new URLSearchParams(location.search); const cid=q.get('cid');
+    const c = getCustomers().find(x=>x.id===cid);
+    if(!c){ alert("Kunde nicht gefunden."); location.href="../crm/customers.html"; }
+    document.getElementById('who').innerText = `Kunde: ${c.firstName} ${c.lastName} • ${c.email}`;
+
+    document.getElementById('f').addEventListener('submit', e=>{
+      e.preventDefault();
+      const title = e.target.title.value;
+      const amount = e.target.amount.value;
+      const start = e.target.start.value;
+      addSubscriptionToCustomer(c.id, { title, amount, nextDue:start, interval:'monthly' });
+      alert("Abo angelegt.");
+      location.href="../crm/customers.html";
+    });
+  </script>
+</body>
+</html>

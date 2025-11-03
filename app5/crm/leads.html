@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>CRM – Leads</title>
+  <script src="../shared/dataStorage.js"></script>
+  <style>
+    body{font-family:Arial,sans-serif;margin:20px}
+    table{border-collapse:collapse}
+    th,td{border:1px solid #ccc;padding:8px}
+    button{padding:6px 10px; margin-right:6px}
+    .topbar{display:flex;gap:10px;margin-bottom:10px}
+  </style>
+</head>
+<body>
+  <h1>CRM – Leads Übersicht</h1>
+
+  <div class="topbar">
+    <button onclick="location.href='../index.html'">← Zurück</button>
+    <button onclick="resetAll()">Daten-Reset (Test)</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Datum</th>
+        <th>Name</th>
+        <th>E-Mail</th>
+        <th>Paket</th>
+        <th>Aktion</th>
+      </tr>
+    </thead>
+    <tbody id="leadTable"></tbody>
+  </table>
+
+  <script>
+    function render(){
+      const tbody = document.getElementById("leadTable");
+      tbody.innerHTML = "";
+      const leads = getLeads();
+
+      leads.forEach((lead, i) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${lead.date || ""}</td>
+          <td>${lead.firstName} ${lead.lastName}</td>
+          <td>${lead.email}</td>
+          <td>${lead.paket}</td>
+          <td>
+            <button onclick="promote(${i})">Promote → Kunde</button>
+            <button onclick="removeLead(${i})">Löschen</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function promote(i){ promoteLeadToCustomer(i); render(); }
+    function removeLead(i){ if(confirm("Lead löschen?")){ deleteLead(i); render(); } }
+
+    render();
+  </script>
+</body>
+</html>

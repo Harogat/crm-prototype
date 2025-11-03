@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Angebot unterschreiben</title>
+  <script src="../shared/dataStorage.js"></script>
+  <style>
+    body{font-family:Arial,sans-serif;margin:20px}
+    #pad{border:1px solid #ccc; touch-action:none}
+    .row{margin:10px 0}
+  </style>
+</head>
+<body>
+  <h1>✍️ Angebot unterschreiben</h1>
+  <div id="info"></div>
+
+  <div class="row">
+    <canvas id="pad" width="600" height="200"></canvas>
+  </div>
+  <div class="row">
+    <button id="clear">Löschen</button>
+    <button id="save">Unterschrift speichern (annehmen)</button>
+  </div>
+
+  <script>
+    // URL-Parameter lesen
+    const q = new URLSearchParams(location.search);
+    const cid = q.get('cid'); const oid = q.get('oid');
+
+    // Kunden/Angebot anzeigen
+    const customers = getCustomers();
+    const c = customers.find(x=>x.id===cid);
+    const offer = c?.offers?.find(o=>o.id===oid);
+    if(!c || !offer){ alert("Daten nicht gefunden."); location.href="../crm/customers.html"; }
+
+    document.getElementById('info').innerText =
+      `Kunde: ${c.firstName} ${c.lastName} • Angebot: ${offer.id} • Paket: ${offer.paket} • Preis: ${offer.preis} €`;
+
+    // Einfaches Signatur-Pad
+    const pad = document.getElementById('pad');
+    const ctx = pad.getContext('2d');
+    ctx.lineWidth = 2; ctx.lineCap = 'round';
+
+    let drawing = false, prev = null;
+
+    function pos(e){
+      const r = pad.getBoundingClientRect();
+      const x = (e.touches? e.touches[0].clientX : e.clientX) - r.left;
+      const y = (e.touches? e.touches[0].clientY : e.clientY) - r.top;
+      return {x,y};
+    }
+
+    function down(e){ drawing = true; prev = pos(e); }
+    function move(e){
+      if(!drawing) return;
+      const p = pos(e);
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      prev = p;
+    }
+    function up(){ drawing = false; prev = null; }
+
+    pad.addEventListener('mousedown', down);
+    pad.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    pad.addEventListener('touchstart', e=>{e.preventDefault(); down(e);});
+    pad.addEventListener('touchmove',  e=>{e.preventDefault(); move(e);});
+    pad.addEventListener('touchend',   e=>{e.preventDefault(); up(e);});
+
+    document.getElementById('clear').onclick = ()=>{ ctx.clearRect(0,0,pad.width,pad.height); };
+
+    document.getElementById('save').onclick = ()=>{
+      const dataUrl = pad.toDataURL("image/png");
+      setOfferAccepted(c.id, offer.id, dataUrl);
+      alert("Angebot akzeptiert und Unterschrift gespeichert.");
+      location.href="../crm/customers.html";
+    };
+  </script>
+</body>
+</html>

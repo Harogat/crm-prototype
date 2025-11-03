@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Angebot erstellen</title>
+  <script src="../shared/dataStorage.js"></script>
+  <!-- jsPDF von CDN (für den Start reicht das) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <style>
+    body{font-family:Arial,sans-serif;margin:20px}
+    label{display:block;margin:8px 0}
+    input,select,button{padding:6px}
+  </style>
+</head>
+<body>
+  <h1>📄 Angebot erstellen</h1>
+  <button onclick="history.back()">← Zurück</button>
+  <div id="customerInfo" style="margin:10px 0; padding:10px; background:#f3f3f3"></div>
+
+  <form id="offerForm">
+    <label>Paket:
+      <select name="paket">
+        <option value="Paket A">Paket A</option>
+        <option value="Paket B">Paket B</option>
+        <option value="Paket C">Paket C</option>
+      </select>
+    </label>
+    <label>Gesamtpreis (brutto) in €:
+      <input type="number" name="preis" required min="1" step="1" value="2000">
+    </label>
+    <button>PDF erzeugen & speichern</button>
+  </form>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const cid = params.get('cid');
+    const customers = getCustomers();
+    const customer = customers.find(c => c.id === cid);
+    if(!customer){ alert("Kunde nicht gefunden."); location.href="../crm/customers.html"; }
+
+    // Kundeninfo anzeigen
+    document.getElementById('customerInfo').innerText =
+      `Kunde: ${customer.firstName} ${customer.lastName} • ${customer.email}`;
+
+    const form = document.getElementById('offerForm');
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const paket = form.paket.value;
+      const preis = Number(form.preis.value||0);
+      const anteil1 = Math.round(preis * 0.30);
+      const anteil2 = Math.round(preis * 0.35);
+      const anteil3 = preis - anteil1 - anteil2; // Rest
+
+      const zahlplanText = `Zahlungsplan: 30% (${anteil1} €) bei Auftrag, 35% (${anteil2} €) nach Meilenstein 1, 35% (${anteil3} €) nach Abnahme.`;
+
+      // 1) Angebot im Speicher anlegen
+      const offer = addOfferToCustomer(customer.id, { paket, preis, zahlplanText });
+
+      // 2) PDF mit jsPDF erzeugen
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      const title = "ANGEBOT";
+      doc.setFont("helvetica","bold"); doc.setFontSize(18);
+      doc.text(title, 105, 20, {align:"center"});
+
+      doc.setFont("helvetica","normal"); doc.setFontSize(12);
+      doc.text(`Kunde: ${customer.firstName} ${customer.lastName}`, 20, 35);
+      doc.text(`E-Mail: ${customer.email}`, 20, 42);
+      doc.text(`Datum: ${new Date().toLocaleDateString("de-DE")}`, 20, 49);
+      doc.text(`Angebots-Nr.: ${offer.id}`, 20, 56);
+
+      doc.setFont("helvetica","bold"); doc.text("Leistung:", 20, 70);
+      doc.setFont("helvetica","normal");
+      doc.text(`• ${paket} – Website/Leistungspaket`, 20, 78);
+
+      doc.setFont("helvetica","bold");
+      doc.text("Preis (gesamt):", 20, 95);
+      doc.setFont("helvetica","normal");
+      doc.text(`${preis} €`, 60, 95);
+
+      doc.setFont("helvetica","bold"); doc.text("Zahlungsmodalitäten:", 20, 110);
+      doc.setFont("helvetica","normal");
+      doc.text(zahlplanText, 20, 118, { maxWidth: 170 });
+
+      doc.setFont("helvetica","bold"); doc.text("Unterschrift (Kunde):", 20, 150);
+      doc.setFont("helvetica","normal"); doc.text("(bitte digital auf der nächsten Seite)", 20, 158);
+
+      // Speichern (Download) – optional
+      doc.save(`Angebot_${offer.id}.pdf`);
+
+      // Weiter zur Signaturseite
+      location.href = `sign.html?cid=${encodeURIComponent(customer.id)}&oid=${encodeURIComponent(offer.id)}`;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Kunde – Dokumente</title>
+    <script src="../shared/dataStorage.js"></script>
+    <style>
+        :root {
+            --line: #e5e7eb;
+            --muted: #6b7280;
+            --ok: #16a34a;
+            --warn: #d97706;
+            --card: #fff
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 20px;
+            color: #111827
+        }
+
+        h1 {
+            margin: 0 0 8px
+        }
+
+        h2 {
+            margin: 22px 0 10px
+        }
+
+        .muted {
+            color: var(--muted)
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 14px
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center
+        }
+
+        .btn {
+            appearance: none;
+            border: 1px solid var(--line);
+            background: #fff;
+            padding: 8px 10px;
+            border-radius: 8px;
+            cursor: pointer
+        }
+
+        .btn.primary {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse
+        }
+
+        th,
+        td {
+            padding: 10px;
+            border-bottom: 1px solid var(--line);
+            text-align: left
+        }
+
+        th {
+            font-weight: 600
+        }
+
+        .status-ok {
+            color: var(--ok);
+            font-weight: 700
+        }
+
+        .status-open {
+            color: var(--warn);
+            font-weight: 700
+        }
+
+        .summary {
+            margin-top: 10px;
+            font-weight: bold
+        }
+
+        /* History */
+        .hist-wrap {
+            margin-top: 6px
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 999px;
+            font-size: 11px
+        }
+
+        .badge.system {
+            background: #eef2ff;
+            color: #3730a3
+        }
+
+        .badge.milestone {
+            background: #ecfdf5;
+            color: #065f46
+        }
+
+        .badge.note {
+            background: #fff7ed;
+            color: #9a3412
+        }
+
+        .addnote {
+            display: flex;
+            gap: 6px;
+            align-items: flex-start;
+            margin-top: 8px
+        }
+
+        .addnote textarea {
+            flex: 1;
+            resize: vertical
+        }
+
+        .addnote .select {
+            min-width: 120px
+        }
+    </style>
+</head>
+
+<body>
+    <button class="btn" onclick="history.back()">← Zurück</button>
+    <h1 id="title">Kunde</h1>
+
+    <!-- ABO -->
+    <h2>Abonnement</h2>
+    <div id="aboBox" class="card muted">Keine Abo-Daten vorhanden.</div>
+
+    <!-- HISTORIE -->
+    <h2>Historie</h2>
+    <div id="histBox" class="card">
+        <div id="histTableWrap" class="hist-wrap muted">Noch keine Ereignisse.</div>
+        <div class="addnote" id="addNoteBox">
+            <select id="noteType" class="select">
+                <option value="note">Notiz</option>
+                <option value="system">System</option>
+                <option value="milestone">Meilenstein</option>
+            </select>
+            <textarea id="noteText" class="input" rows="2" placeholder="Kurze Notiz …"></textarea>
+            <button id="btnAddNote" class="btn">+ Hinzufügen</button>
+        </div>
+    </div>
+
+    <!-- ANGEBOTE -->
+    <h2>Angebote</h2>
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Paket</th>
+                    <th>Preis</th>
+                    <th>Erstellt</th>
+                </tr>
+            </thead>
+            <tbody id="offers"></tbody>
+        </table>
+    </div>
+
+    <!-- RECHNUNGEN -->
+    <h2>Rechnungen</h2>
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nr.</th>
+                    <th>Titel</th>
+                    <th>Betrag</th>
+                    <th>Status</th>
+                    <th>Aktion</th>
+                </tr>
+            </thead>
+            <tbody id="invoices"></tbody>
+        </table>
+        <div id="invoiceSummary" class="summary"></div>
+    </div>
+
+    <script>
+        // ===== Setup & Helpers =====
+        const q = new URLSearchParams(location.search);
+        const cid = q.get('cid');
+        const customers = getCustomers();
+        const c = customers.find(x => x.id === cid);
+        if (!c) { alert('Kunde nicht gefunden.'); location.href = './customers.html'; }
+
+        const fmtEUR = n => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(n) || 0);
+        const safe = s => s ?? '';
+
+        document.getElementById('title').textContent =
+            `Kunde: ${safe(c.firstName)} ${safe(c.lastName)} • ${safe(c.email)}`;
+
+        // ===== ABO =====
+        (function renderAbo() {
+            const box = document.getElementById('aboBox');
+            const subs = c.subscriptions || [];
+            if (subs.length === 0) {
+                box.innerHTML = `
+          <div class="muted">Kein Abo angelegt. Du kannst im Kundenbereich ein
+          <button class="btn" onclick="location.href='../offer/subscription_offer.html?cid=${encodeURIComponent(c.id)}'">Abo-Angebot erstellen</button>
+          </div>`;
+                return;
+            }
+            const s = subs[0];
+            if (!s.active) {
+                box.innerHTML = `
+          <div class="row">
+            <div><b>Abo (ausstehend):</b> ${safe(s.title)}</div>
+            <div>• Betrag: ${fmtEUR(s.amount)}</div>
+            <div>• Start: ${safe(s.nextDue)}</div>
+          </div>
+          <div style="margin-top:8px">
+            <button class="btn primary"
+              onclick="location.href='../offer/subscription_sign.html?cid=${encodeURIComponent(c.id)}&sid=${encodeURIComponent(s.id)}'">
+              ✍️ Unterschreiben & aktivieren
+            </button>
+          </div>`;
+            } else {
+                box.innerHTML = `
+          <div class="row">
+            <div><b>Abo:</b> ${safe(s.title)}</div>
+            <div>• Betrag: ${fmtEUR(s.amount)}</div>
+            <div>• nächster Termin: ${safe(s.nextDue)}</div>
+            <div class="status-ok">• Status: aktiv</div>
+          </div>
+          <div style="margin-top:8px">
+            <button class="btn"
+              onclick="location.href='../invoice/sub_bill.html?cid=${encodeURIComponent(c.id)}&sid=${encodeURIComponent(s.id)}'">
+              📄 Monatsrechnung erzeugen
+            </button>
+          </div>`;
+            }
+        })();
+
+        // ===== HISTORIE =====
+        function renderHistory() {
+            const wrap = document.getElementById('histTableWrap');
+            const hist = (c.history || []).slice().reverse();
+            if (!hist.length) {
+                wrap.classList.add('muted');
+                wrap.innerHTML = 'Noch keine Ereignisse.';
+                return;
+            }
+            wrap.classList.remove('muted');
+            wrap.innerHTML = `
+        <table>
+          <thead><tr><th>Zeit</th><th>Typ</th><th>Eintrag</th></tr></thead>
+          <tbody>
+            ${hist.map(h => `
+              <tr>
+                <td>${new Date(h.ts).toLocaleString()}</td>
+                <td><span class="badge ${h.type}">${h.type}</span></td>
+                <td>${h.message}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+        }
+        renderHistory();
+
+        // Notiz hinzufügen
+        document.getElementById('btnAddNote').addEventListener('click', () => {
+            const type = document.getElementById('noteType').value || 'note';
+            const text = (document.getElementById('noteText').value || '').trim();
+            if (!text) { alert('Bitte eine Notiz eingeben.'); return; }
+            addHistory(c.id, type, text);
+            document.getElementById('noteText').value = '';
+            // page-refresh der Daten
+            const fresh = getCustomers().find(x => x.id === c.id);
+            Object.assign(c, fresh || {});
+            renderHistory();
+        });
+
+        // ===== ANGEBOTE =====
+        (function renderOffers() {
+            const body = document.getElementById('offers');
+            const offers = c.offers || [];
+            if (!offers.length) {
+                body.innerHTML = `<tr><td colspan="5" class="muted">Keine Angebote vorhanden.</td></tr>`;
+                return;
+            }
+            offers.forEach(o => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+          <td>${safe(o.id)}</td>
+          <td>${safe(o.status)}</td>
+          <td>${safe(o.paket) || ''}</td>
+          <td>${o.preis != null ? fmtEUR(o.preis) : ''}</td>
+          <td class="muted">${safe(o.createdAt) || ''}</td>`;
+                body.appendChild(tr);
+            });
+        })();
+
+        // ===== RECHNUNGEN + Summen =====
+        (function renderInvoices() {
+            const body = document.getElementById('invoices');
+            const invoices = c.invoices || [];
+            if (!invoices.length) {
+                body.innerHTML = `<tr><td colspan="5" class="muted">Keine Rechnungen vorhanden.</td></tr>`;
+                document.getElementById('invoiceSummary').textContent = '';
+                return;
+            }
+            let total = 0, paid = 0, open = 0;
+            invoices.forEach(inv => {
+                const amount = Number(inv.amount) || 0;
+                total += amount;
+                if (inv.status === 'bezahlt') paid += amount; else open += amount;
+
+                const statusClass = inv.status === 'bezahlt' ? 'status-ok' : 'status-open';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+          <td>${inv.number ?? ''}</td>
+          <td>${inv.title ?? ''}</td>
+          <td>${fmtEUR(amount)}</td>
+          <td class="${statusClass}">${inv.status || 'offen'}</td>
+          <td>
+            ${inv.status === 'bezahlt'
+                        ? `<button class="btn" onclick="setInvoiceStatus('${c.id}','${inv.id}','offen'); location.reload();">auf „offen“ setzen</button>`
+                        : `<button class="btn" onclick="setInvoiceStatus('${c.id}','${inv.id}','bezahlt'); location.reload();">als bezahlt markieren</button>`}
+          </td>`;
+                body.appendChild(tr);
+            });
+            document.getElementById('invoiceSummary').innerHTML =
+                `Gesamt: ${fmtEUR(total)} | Bezahlt: <span class="status-ok">${fmtEUR(paid)}</span> | Offen: <span class="status-open">${fmtEUR(open)}</span>`;
+        })();
+    </script>
+</body>
+
+</html>

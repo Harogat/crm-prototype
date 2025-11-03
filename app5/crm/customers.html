@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>CRM – Kunden (Cards)</title>
+  <script src="../shared/dataStorage.js"></script>
+  <style>
+    :root {
+      --bg: #f7f7f8;
+      --fg: #111827;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --card: #fff;
+      --brand: #2563eb;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 20px;
+      font-family: system-ui, Segoe UI, Roboto, Arial;
+      background: var(--bg);
+      color: var(--fg)
+    }
+
+    h1 {
+      margin: 0 0 10px
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 8px 0 16px
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer
+    }
+
+    .btn.primary {
+      background: var(--brand);
+      color: #fff;
+      border-color: var(--brand)
+    }
+
+    .input,
+    .select {
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px
+    }
+
+    .input {
+      min-width: 260px
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 12px
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      user-select: none
+    }
+
+    .card.active {
+      outline: 2px solid var(--brand);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, .15)
+    }
+
+    .card.dragging {
+      opacity: .6
+    }
+
+    .card.drop-target {
+      outline: 2px dashed #94a3b8
+    }
+
+    /* Flash-Highlight */
+    @keyframes flashCard {
+      0% {
+        outline-color: #f59e0b;
+        box-shadow: 0 0 0 6px rgba(245, 158, 11, .25)
+      }
+
+      100% {
+        outline-color: transparent;
+        box-shadow: none
+      }
+    }
+
+    .card.flash {
+      outline: 2px solid #f59e0b;
+      animation: flashCard .8s ease-out 1
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px
+    }
+
+    .name {
+      font-weight: 700
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 12px
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      font-size: 12px
+    }
+
+    .pill.ok {
+      background: #ecfdf5;
+      color: #065f46;
+      border-color: #d1fae5
+    }
+
+    .pill.warn {
+      background: #fffbeb;
+      color: #92400e;
+      border-color: #fde68a
+    }
+
+    .pill.danger {
+      background: #fef2f2;
+      color: #991b1b;
+      border-color: #fecaca
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px
+    }
+
+    .small {
+      font-size: 12px
+    }
+
+    details {
+      margin-top: 10px
+    }
+
+    summary {
+      cursor: pointer;
+      list-style: none
+    }
+
+    summary::-webkit-details-marker {
+      display: none
+    }
+
+    .caret {
+      margin-left: 6px
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 6px 4px;
+      text-align: left;
+      font-size: 13px
+    }
+
+    th {
+      font-weight: 600
+    }
+
+    .right {
+      text-align: right
+    }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+      padding: 6px 0
+    }
+
+    /* Paket-Labels */
+    .paketLabel {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff
+    }
+
+    .paketA {
+      background: #2563eb
+    }
+
+    .paketB {
+      background: #16a34a
+    }
+
+    .paketC {
+      background: #f59e0b
+    }
+
+    /* Drawer */
+    #drawer {
+      position: fixed;
+      top: 0;
+      right: -420px;
+      width: 420px;
+      height: 100%;
+      background: #fff;
+      border-left: 1px solid #ccc;
+      box-shadow: -4px 0 20px rgba(0, 0, 0, .06);
+      padding: 16px;
+      transition: right .25s ease;
+      overflow: auto;
+      z-index: 10
+    }
+
+    #drawer h3 {
+      margin: 0
+    }
+
+    #editForm input,
+    #editForm textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px
+    }
+
+    #editForm>div {
+      margin-top: 10px
+    }
+
+    @media (max-width:560px) {
+      #drawer {
+        width: 100%
+      }
+    }
+
+    /* History badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 11px
+    }
+
+    .badge.system {
+      background: #eef2ff;
+      color: #3730a3
+    }
+
+    .badge.milestone {
+      background: #ecfdf5;
+      color: #065f46
+    }
+
+    .badge.note {
+      background: #fff7ed;
+      color: #9a3412
+    }
+  </style>
+</head>
+
+<body>
+  <h1>CRM – Kunden</h1>
+
+  <div class="toolbar">
+    <button class="btn" onclick="location.href='../index.html'">← Zurück</button>
+    <button id="btnExport" class="btn">📤 CSV exportieren</button>
+    <input id="search" class="input" placeholder="Suche nach Name oder E-Mail">
+    <select id="filter" class="select" title="Filter">
+      <option value="all">Alle</option>
+      <option value="due">Abo fällig</option>
+      <option value="overdue">Abo überfällig</option>
+      <option value="accepted">Angebot akzeptiert</option>
+      <option value="openinv">Rechnungen offen</option>
+      <option value="noabo">Kein Abo</option>
+    </select>
+  </div>
+
+  <div id="wrap" class="grid"></div>
+
+  <!-- Drawer -->
+  <div id="drawer">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3>Kundendetails</h3>
+      <button id="btnCloseDrawer" class="btn">✕</button>
+    </div>
+    <form id="editForm">
+      <input type="hidden" name="id">
+      <div><label>Vorname<br><input name="firstName"></label></div>
+      <div><label>Nachname<br><input name="lastName"></label></div>
+      <div><label>E-Mail<br><input name="email" type="email"></label></div>
+      <div><label>Paket<br><input name="paket" placeholder="Paket A/B/C"></label></div>
+      <hr>
+      <div><label>Straße<br><input name="street"></label></div>
+      <div><label>PLZ<br><input name="zip"></label></div>
+      <div><label>Ort<br><input name="city"></label></div>
+      <div><label>Land<br><input name="country" placeholder="DE"></label></div>
+      <div><label>Telefon<br><input name="phone"></input></label></div>
+      <div><label>Instagram<br><input name="instagram" placeholder="@handle"></label></div>
+      <div><label>Facebook<br><input name="facebook"></label></div>
+      <div><label>LinkedIn<br><input name="linkedin"></label></div>
+      <div><label>Website<br><input name="website" type="url"></label></div>
+      <div><label>Notizen<br><textarea name="notes" rows="4"></textarea></label></div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button type="submit" class="btn primary">💾 Speichern</button>
+        <button type="button" id="btnCancel" class="btn">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Overlay & Toast -->
+  <div id="overlay" style="position:fixed;inset:0;display:none;background:rgba(0,0,0,.1);z-index:9"></div>
+  <div id="toast"
+    style="position:fixed;bottom:20px;right:20px;background:#2563eb;color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:20">
+  </div>
+
+  <script>
+    // ===== Utilities =====
+    function monthPrefix(d = new Date()) { const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'); return `${y}-${m}`; }
+    function isDueThisMonth(iso) { if (!iso) return false; return String(iso).slice(0, 7) === monthPrefix(); }
+    function isOverdue(iso) { if (!iso) return false; const today = new Date().toISOString().slice(0, 10); return String(iso) < today; }
+    function eur(n) { return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Number(n) || 0); }
+    function hasOpenInvoices(c) { return (c.invoices || []).some(inv => (inv.status || 'offen') !== 'bezahlt'); }
+    function acceptedOfferOf(c) { return (c.offers || []).find(o => o.status === 'akzeptiert'); }
+    function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2200); }
+    function flashCardById(id) { const node = document.querySelector(`.card[data-cid="${id}"]`); if (!node) return; node.classList.add('flash'); node.addEventListener('animationend', () => node.classList.remove('flash'), { once: true }); }
+
+    const search = document.getElementById('search');
+    const filter = document.getElementById('filter');
+    const wrap = document.getElementById('wrap');
+
+    // Highlight aktivierte Card
+    let activeCardId = null;
+    function highlightCard(id) {
+      document.querySelectorAll('.card').forEach(n => n.classList.remove('active'));
+      const node = document.querySelector(`.card[data-cid="${id}"]`);
+      if (node) { node.classList.add('active'); activeCardId = id; }
+    }
+    function clearHighlight() { document.querySelectorAll('.card').forEach(n => n.classList.remove('active')); activeCardId = null; }
+
+    function cardStatus(c) {
+      const s = (c.subscriptions || [])[0];
+      if (!s) return { label: 'Kein Abo', cls: 'pill' };
+      if (!s.active) return { label: `Abo ausstehend (Start: ${s.nextDue || '-'})`, cls: 'pill' };
+      if (isOverdue(s.nextDue)) return { label: `Überfällig – ${s.nextDue}`, cls: 'pill danger' };
+      if (isDueThisMonth(s.nextDue)) return { label: `Jetzt fällig – ${s.nextDue}`, cls: 'pill warn' };
+      return { label: `Aktiv – nächste Fälligkeit ${s.nextDue}`, cls: 'pill ok' };
+    }
+
+    function passFilter(c, mode) {
+      const s = (c.subscriptions || [])[0];
+      if (mode === 'all') return true;
+      if (mode === 'due') return s && s.active && isDueThisMonth(s.nextDue);
+      if (mode === 'overdue') return s && s.active && isOverdue(s.nextDue);
+      if (mode === 'accepted') return (c.offers || []).some(o => o.status === 'akzeptiert');
+      if (mode === 'openinv') return hasOpenInvoices(c);
+      if (mode === 'noabo') return !s;
+      return true;
+    }
+
+    function prioritySort(a, b) {
+      const sa = (a.subscriptions || [])[0], sb = (b.subscriptions || [])[0];
+      const score = x => { if (!x) return 0; const active = x.active ? 2 : 0; const due = isDueThisMonth(x?.nextDue) ? 1 : 0; const over = isOverdue(x?.nextDue) ? 1 : 0; return active + (due || over); };
+      const diff = score(sb) - score(sa); if (diff) return diff;
+      const aAcc = (a.offers || []).some(o => o.status === 'akzeptiert') ? 1 : 0;
+      const bAcc = (b.offers || []).some(o => o.status === 'akzeptiert') ? 1 : 0;
+      if (bAcc - aAcc) return bAcc - aAcc;
+      return (new Date(b.dateAdded || 0)) - (new Date(a.dateAdded || 0));
+    }
+
+    function applyOrder(customers) {
+      const order = JSON.parse(localStorage.getItem('customerOrder') || '[]');
+      if (!order.length) return customers;
+      const map = new Map(customers.map(c => [c.id, c]));
+      const sorted = order.map(id => map.get(id)).filter(Boolean);
+      customers.forEach(c => { if (!order.includes(c.id)) sorted.push(c); });
+      return sorted;
+    }
+
+    function render() {
+      const q = (search.value || '').trim().toLowerCase();
+      const mode = filter.value;
+
+      const allRaw = getCustomers();
+      const order = JSON.parse(localStorage.getItem('customerOrder') || '[]');
+      const all = applyOrder(allRaw.slice());
+
+      if (order.length) {
+        const orderMap = new Map(order.map((id, idx) => [id, idx]));
+        all.sort((a, b) => {
+          const ia = orderMap.has(a.id) ? orderMap.get(a.id) : Number.POSITIVE_INFINITY;
+          const ib = orderMap.has(b.id) ? orderMap.get(b.id) : Number.POSITIVE_INFINITY;
+          if (ia !== ib) return ia - ib;
+          return prioritySort(a, b);
+        });
+      } else {
+        all.sort(prioritySort);
+      }
+
+      wrap.innerHTML = '';
+      let shown = 0;
+
+      all.forEach(c => {
+        const hay = `${c.firstName || ''} ${c.lastName || ''} ${c.email || ''}`.toLowerCase();
+        if (q && !hay.includes(q)) return;
+        if (!passFilter(c, mode)) return;
+
+        const acc = acceptedOfferOf(c);
+        const s = (c.subscriptions || [])[0];
+        const st = cardStatus(c);
+
+        const has30 = acc && hasInvoiceWithTitle(c.id, acc.id, "Anzahlung 30%");
+        const hasM1 = acc && hasInvoiceWithTitle(c.id, acc.id, "Meilenstein 1 (35%)");
+        const hasM2 = acc && hasInvoiceWithTitle(c.id, acc.id, "Meilenstein 2 (35%)");
+
+        const actions = [];
+        actions.push(`<button class="btn" data-link="../offer/create.html?cid=${encodeURIComponent(c.id)}">Angebot</button>`);
+        actions.push(`<button class="btn" data-link="../offer/subscription_offer.html?cid=${encodeURIComponent(c.id)}">Abo-Angebot</button>`);
+        actions.push(`<button class="btn" data-link="./customer_detail.html?cid=${encodeURIComponent(c.id)}">Dokumente</button>`);
+        actions.push(`<button class="btn" data-link="./projects.html?cid=${encodeURIComponent(c.id)}">Projekte</button>`);
+
+        if (acc && !has30) actions.push(`<button class="btn" data-link="../invoice/new.html?cid=${encodeURIComponent(c.id)}&oid=${encodeURIComponent(acc.id)}">30% Rechnung</button>`);
+        if (acc && has30 && !hasM1) actions.push(`<button class="btn" data-link="../invoice/m1.html?cid=${encodeURIComponent(c.id)}&oid=${encodeURIComponent(acc.id)}">35% (M1)</button>`);
+        if (acc && has30 && hasM1 && !hasM2) actions.push(`<button class="btn" data-link="../invoice/m2.html?cid=${encodeURIComponent(c.id)}&oid=${encodeURIComponent(acc.id)}">35% (M2)</button>`);
+
+        let subAction = '';
+        if (s) {
+          if (!s.active) {
+            subAction = `<button class="btn primary" data-link="../offer/subscription_sign.html?cid=${encodeURIComponent(c.id)}&sid=${encodeURIComponent(s.id)}">Abo unterschreiben</button>`;
+          } else {
+            const canBill = isOverdue(s.nextDue) || isDueThisMonth(s.nextDue);
+            const dis = canBill ? '' : 'disabled style="opacity:.6;cursor:not-allowed"';
+            subAction = `<button class="btn" ${dis} data-link="../invoice/sub_bill.html?cid=${encodeURIComponent(c.id)}&sid=${encodeURIComponent(s.id)}">Monatsrechnung</button>`;
+          }
+        }
+
+        const paket = (c.paket || '-').trim();
+        const pkgCls = paket === 'Paket A' ? 'paketA' : paket === 'Paket B' ? 'paketB' : paket === 'Paket C' ? 'paketC' : '';
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.cid = c.id;
+
+        card.innerHTML = `
+          <div class="row" data-edit-head="${c.id}">
+            <div>
+              <div class="name">${c.firstName || ''} ${c.lastName || ''}</div>
+              <div class="muted small">${c.email || ''}</div>
+              <div class="muted small">
+                ${paket !== '-' ? `<span class="paketLabel ${pkgCls}">${paket}</span>` : 'Paket: -'}
+                • erstellt: ${c.dateAdded || '-'}
+              </div>
+            </div>
+            <div><span class="${st.cls}">${st.label}</span></div>
+          </div>
+
+          <div class="actions">
+            ${actions.join('')}
+            ${subAction}
+          </div>
+
+          <details>
+            <summary>Details <span class="caret">▾</span></summary>
+            ${renderDetails(c)}
+          </details>
+        `;
+        wrap.appendChild(card);
+        shown++;
+      });
+
+      if (shown === 0) {
+        wrap.innerHTML = `<div class="card"><div class="empty">Keine Einträge gefunden.</div></div>`;
+      } else {
+        enableDnD();
+        // nach rendern: Flash falls via Save/Promote markiert
+        const flashId = sessionStorage.getItem('highlightCustomerId') || localStorage.getItem('highlightCustomerId');
+        if (flashId) {
+          flashCardById(flashId);
+          sessionStorage.removeItem('highlightCustomerId');
+          localStorage.removeItem('highlightCustomerId');
+        }
+      }
+    }
+
+    function renderDetails(c) {
+      const offers = c.offers || [], invs = c.invoices || [], subs = c.subscriptions || [];
+
+      const offersHtml = offers.length ? `
+        <table><thead><tr><th>ID</th><th>Status</th><th>Paket</th><th class="right">Preis</th><th>Erstellt</th></tr></thead>
+        <tbody>
+          ${offers.map(o => `
+            <tr>
+              <td>${o.id}</td>
+              <td>${o.status || ''}</td>
+              <td>${o.paket || ''}</td>
+              <td class="right">${o.preis ? eur(o.preis) : ''}</td>
+              <td>${o.createdAt || ''}</td>
+            </tr>`).join('')}
+        </tbody></table>` : `<div class="empty">Keine Angebote.</div>`;
+
+      const invsHtml = invs.length ? `
+        <table><thead><tr><th>Nr.</th><th>Titel</th><th class="right">Betrag</th><th>Status</th><th>Datum</th></tr></thead>
+        <tbody>
+          ${invs.map(i => `
+            <tr>
+              <td>${i.number || ''}</td>
+              <td>${i.title || ''}</td>
+              <td class="right">${eur(i.amount)}</td>
+              <td>${i.status || 'offen'}</td>
+              <td>${i.createdAt || ''}</td>
+            </tr>`).join('')}
+        </tbody></table>` : `<div class="empty">Keine Rechnungen.</div>`;
+
+      const subsHtml = subs.length ? `
+        <table><thead><tr><th>Titel</th><th class="right">Monat</th><th>Status</th><th>Nächste Fälligkeit</th></tr></thead>
+        <tbody>
+          ${subs.map(s => `
+            <tr>
+              <td>${s.title || ''}</td>
+              <td class="right">${eur(s.amount)}</td>
+              <td>${s.active ? 'aktiv' : 'ausstehend'}</td>
+              <td>${s.nextDue || ''}</td>
+            </tr>`).join('')}
+        </tbody></table>` : `<div class="empty">Kein Abo.</div>`;
+
+      const hist = (c.history || []).slice().reverse(); // neueste zuerst
+      const histHtml = hist.length ? `
+        <table>
+          <thead><tr><th>Zeit</th><th>Typ</th><th>Eintrag</th></tr></thead>
+          <tbody>
+            ${hist.map(h => `
+              <tr>
+                <td>${new Date(h.ts).toLocaleString()}</td>
+                <td><span class="badge ${h.type}">${h.type}</span></td>
+                <td>${h.message}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>` : `<div class="empty">Noch keine Ereignisse.</div>`;
+
+        const addNoteHtml = `
+        <div class="addnote" data-cid="${c.id}" style="display:flex;gap:6px;align-items:flex-start;margin-top:8px">
+          <select class="select small" style="min-width:110px">
+            <option value="note">Notiz</option>
+            <option value="system">System</option>
+            <option value="milestone">Meilenstein</option>
+          </select>
+          <textarea class="input small" rows="2" placeholder="Kurze Notiz …" style="flex:1;resize:vertical"></textarea>
+          <button class="btn small" data-add-note="${c.id}">+ Hinzufügen</button>
+        </div>`;
+
+        const projs = c.projects || [];
+        const projsHtml = projs.length ? `
+        <table>
+          <thead><tr><th>Titel</th><th>aus Angebot</th><th>Status</th><th>Erstellt</th></tr></thead>
+          <tbody>
+            ${projs.map(p => `
+              <tr>
+                <td>${p.title}</td>
+                <td>${p.offerId || ''}</td>
+                <td>${p.status || 'open'}</td>
+                <td>${new Date(p.createdAt).toLocaleString()}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>` : `<div class="empty">Keine Projekte.</div>`;
+
+      return `
+      <div style="margin-top:12px"><strong>Historie</strong>${histHtml}${addNoteHtml}</div>
+      <div style="margin-top:6px"><strong>Angebote</strong>${offersHtml}</div>
+      <div style="margin-top:12px"><strong>Rechnungen</strong>${invsHtml}</div>
+      <div style="margin-top:12px"><strong>Abonnement</strong>${subsHtml}</div>
+      <div style="margin-top:12px"><strong>Projekte</strong>${projsHtml}
+        <div style="margin-top:6px">
+          <button class="btn" data-link="./projects.html?cid=${encodeURIComponent(c.id)}">→ Projekt-Board öffnen</button>
+        </div>
+      </div>`;
+    }
+
+    // ===== Drawer =====
+    const drawer = document.getElementById('drawer');
+    const editForm = document.getElementById('editForm');
+    const overlay = document.getElementById('overlay');
+
+    function openDrawer() { drawer.style.right = '0'; overlay.style.display = 'block'; document.body.style.overflow = 'hidden'; }
+    function closeDrawer() { drawer.style.right = '-420px'; overlay.style.display = 'none'; document.body.style.overflow = ''; clearHighlight(); }
+    overlay.addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+    function openCustomerEditor(customer) {
+      const c = Object.assign({}, normalizeCustomer(customer));
+      for (const el of editForm.elements) { if (!el.name) continue; el.value = c[el.name] ?? ''; }
+      openDrawer();
+      editForm.elements.firstName?.focus();
+    }
+
+    // Save
+    editForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const data = {};
+      for (const el of editForm.elements) { if (!el.name) continue; data[el.name] = el.value.trim(); }
+      if (!data.id) { toast('Fehlende ID.'); return; }
+      if (data.email && !isValidEmail(data.email)) { toast('Bitte gültige E-Mail eingeben.'); return; }
+
+      sessionStorage.setItem('highlightCustomerId', data.id);
+      updateCustomerById(data.id, data);
+      toast('Kunde gespeichert');
+      closeDrawer();
+      render();
+    });
+
+    document.getElementById('btnCloseDrawer').onclick = closeDrawer;
+    document.getElementById('btnCancel').onclick = closeDrawer;
+
+    // Delegation: Links / Kopf klickbar
+    wrap.addEventListener('click', e => {
+      const btn = e.target.closest('button');
+      if (btn && btn.dataset.link) { location.href = btn.dataset.link; e.stopPropagation(); return; }
+      // Notiz hinzufügen
+      const addBtn = e.target.closest('button[data-add-note]');
+      if (addBtn) {
+        const cid = addBtn.dataset.addNote;
+        const box = wrap.querySelector(`.addnote[data-cid="${cid}"] textarea`);
+        const sel = wrap.querySelector(`.addnote[data-cid="${cid}"] select`);
+        const msg = (box?.value || '').trim();
+        if (!msg) { toast('Bitte eine Notiz eingeben.'); return; }
+
+        addHistory(cid, sel?.value || 'note', msg);
+        sessionStorage.setItem('highlightCustomerId', cid);
+        box.value = '';
+        render();
+        e.stopPropagation();
+        return;
+      }
+      const head = e.target.closest('[data-edit-head]');
+      if (head) {
+        const id = head.dataset.editHead;
+        const c = getCustomers().find(x => x.id === id);
+        if (c) { highlightCard(id); openCustomerEditor(c); }
+      }
+    });
+
+    // ===== Drag & Drop =====
+    let dndContainerBound = false;
+    function enableDnD() {
+      // Container-Listener nur einmal registrieren
+      if (!dndContainerBound) {
+        wrap.addEventListener('dragover', e => { e.preventDefault(); });
+        dndContainerBound = true;
+      }
+
+      wrap.querySelectorAll('.card').forEach(card => {
+        card.draggable = true;
+
+        card.addEventListener('dragstart', e => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', card.dataset.cid);
+          card.classList.add('dragging');
+        });
+
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+          removeDropStyles();
+        });
+
+        card.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          removeDropStyles();
+          card.classList.add('drop-target');
+        });
+
+        card.addEventListener('dragleave', () => { card.classList.remove('drop-target'); });
+
+        card.addEventListener('drop', e => {
+          e.preventDefault();
+          const draggedId = e.dataTransfer.getData('text/plain');
+          const targetId = card.dataset.cid;
+          if (!draggedId || draggedId === targetId) return;
+
+          const dragged = wrap.querySelector(`.card[data-cid="${draggedId}"]`);
+          if (!dragged) return;
+
+          const cards = [...wrap.querySelectorAll('.card')];
+          const dragIndex = cards.indexOf(dragged);
+          const targetIndex = cards.indexOf(card);
+
+          if (dragIndex < targetIndex) { wrap.insertBefore(dragged, card.nextSibling); }
+          else { wrap.insertBefore(dragged, card); }
+
+          saveOrder();
+          removeDropStyles();
+        });
+      });
+
+      function removeDropStyles() {
+        wrap.querySelectorAll('.card.drop-target').forEach(n => n.classList.remove('drop-target'));
+      }
+    }
+
+    function saveOrder() {
+      const ids = [...wrap.querySelectorAll('.card')].map(c => c.dataset.cid);
+      localStorage.setItem('customerOrder', JSON.stringify(ids));
+    }
+
+    // Suche/Filter & CSV
+    let t;
+    search.addEventListener('input', () => { clearTimeout(t); t = setTimeout(render, 150); });
+    filter.addEventListener('change', render);
+    document.getElementById('btnExport').addEventListener('click', exportCustomersCSV);
+
+    // Init
+    render();
+  </script>
+</body>
+
+</html>

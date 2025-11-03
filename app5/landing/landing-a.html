@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Landingpage A</title>
+  <script src="../shared/dataStorage.js"></script>
+</head>
+
+<body>
+  <h1>Paket A – Anfrage</h1>
+  <form id="leadForm">
+    <label>Vorname: <input type="text" id="firstName" required></label><br><br>
+    <label>Nachname: <input type="text" id="lastName" required></label><br><br>
+    <label>Email: <input type="email" id="email" required></label><br><br>
+    <label>Straße: <input type="text" id="street" required></label><br><br>
+    <label>PLZ: <input type="zip" id="zip" required></label><br><br>
+    <label>Stadt: <input type="text" id="city" required></label><br><br>
+    <label>Telefon: <input type="number" id="phone" required></label><br><br>
+    <label>Instagramm: <input type="text" id="instagram" required></label><br><br>
+    <label>Notiz: <input type="text" id="notes" required></label><br><br>
+    <button type="submit">Absenden</button>
+  </form>
+
+  <br>
+  <!-- Testbutton -->
+  <button id="randomLeadBtn">🎲 Zufalls-Lead erzeugen</button>
+
+  <script>
+    document.getElementById("leadForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const lead = {
+      firstName: document.getElementById("firstName").value,
+      lastName: document.getElementById("lastName").value,
+      email: document.getElementById("email").value,
+      paket: "Paket A",
+      street: document.getElementById("street").value,
+      zip: document.getElementById("zip").value,
+      city: document.getElementById("city").value,
+      phone: document.getElementById("phone").value,
+      instagram: document.getElementById("instagram").value,
+      notes: document.getElementById("notes").value,
+      date: new Date().toLocaleString()
+    };
+
+      addLead(lead);
+
+      alert("✅ Lead gespeichert!");
+      this.reset();
+    });
+
+    // Zufallsdaten
+    const firstNames = ["Anna", "Ben", "Clara", "David", "Eva", "Felix", "Greta", "Hans", "Isabel", "Jonas"];
+    const lastNames = ["Müller", "Schmidt", "Fischer", "Weber", "Becker", "Hoffmann", "Wagner", "Schäfer", "Koch", "Bauer"];
+
+    function randomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    document.getElementById("randomLeadBtn").addEventListener("click", function () {
+      const fn = randomItem(firstNames);
+      const ln = randomItem(lastNames);
+      const lead = {
+        firstName: fn,
+        lastName: ln,
+        email: `${fn.toLowerCase()}.${ln.toLowerCase()}${Math.floor(Math.random() * 100)}@testmail.com`,
+        paket: "Paket A",
+        date: new Date().toLocaleString()
+      };
+
+      addLead(lead);
+      alert(`🎲 Zufalls-Lead gespeichert:\n${lead.firstName} ${lead.lastName}`);
+    });
+  </script>
+</body>
+
+</html>

@@ -1,1 +1,399 @@
-<!doctype html><title>CRM</title><h1>CRM Starter</h1>
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Mini CRM – Dashboard</title>
+  <script src="./shared/dataStorage.js"></script>
+  <style>
+    :root {
+      --bg: #f7f7f8;
+      --fg: #222;
+      --muted: #666;
+      --card: #fff;
+      --line: #e6e6e9;
+      --brand: #2563eb;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      margin: 0;
+      padding: 32px
+    }
+
+    h1 {
+      margin: 0 0 8px
+    }
+
+    p {
+      margin: 0 0 20px;
+      color: var(--muted)
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px
+    }
+
+    .kpi {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px
+    }
+
+    .val {
+      font-size: 28px;
+      font-weight: 700
+    }
+
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 16px 0 24px
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--fg);
+      cursor: pointer
+    }
+
+    .btn.primary {
+      background: var(--brand);
+      color: #fff;
+      border-color: var(--brand)
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 8px;
+      text-align: left;
+      font-size: 14px
+    }
+
+    th {
+      font-weight: 600
+    }
+
+    .right {
+      text-align: right
+    }
+
+    small.muted {
+      color: var(--muted)
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 12px;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px
+    }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+      padding: 10px 0
+    }
+
+    .card .caret {
+      float: right;
+      transition: transform .15s ease;
+    }
+
+    .card[aria-expanded="true"] .caret {
+      transform: rotate(180deg);
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🚀 Mini-CRM Dashboard</h1>
+  <p>Kurzer Überblick. Arbeite dich dann über die Buttons in die Bereiche rein.</p>
+
+  <!-- Navigation -->
+  <div class="nav">
+    <a class="btn primary" href="./landing/landing-a.html">➕ Lead anlegen (Paket A)</a>
+    <a class="btn" href="./crm/leads.html">👀 Leads ansehen</a>
+    <a class="btn" href="./crm/customers.html">👥 Kunden & Aktionen</a>
+    <button class="btn" onclick="exportBackup()">📦 Backup (JSON) herunterladen</button>
+    <button class="btn" onclick="importBackup()">📂 Backup importieren</button>
+  </div>
+
+  <!-- KPIs -->
+  <div class="grid" id="kpis">
+    <div class="card">
+      <div class="kpi">Leads gesamt</div>
+      <div class="val" id="kpiLeads">0</div>
+      <small class="muted">Eingänge aus Landingpages</small>
+    </div>
+    <div class="card">
+      <div class="kpi">Kunden gesamt</div>
+      <div class="val" id="kpiCustomers">0</div>
+      <small class="muted">Promotete Leads</small>
+    </div>
+    <div class="card">
+      <div class="kpi">Offene Rechnungen</div>
+      <div class="val" id="kpiInvoicesOpen">0</div>
+      <small class="muted">Status ≠ „bezahlt“ (oder leer)</small>
+    </div>
+    <div class="card">
+      <div class="kpi">Aktive Abos (MRR)</div>
+      <div class="val"><span id="kpiSubs">0</span> <span class="badge" id="kpiMRR">0 €</span></div>
+      <small class="muted">Monatlicher Abo-Umsatz (Summe)</small>
+    </div>
+    <div class="card"
+      onclick="togglePaid30(); this.setAttribute('aria-expanded', this.getAttribute('aria-expanded')!=='true');"
+      style="cursor:pointer" aria-expanded="false">
+      <div class="kpi">Bezahlt (30 Tage) <span class="caret">▾</span></div>
+      <div id="paid30" class="val">0 €</div>
+    </div>
+  </div>
+
+  <!-- Aufklapp-Liste für „Bezahlt (30 Tage)“ -->
+  <div id="paid30List" class="card" style="display:none; margin-top:12px"></div>
+
+  <!-- Fällige Abo-Rechnungen (dieser Monat) -->
+  <div class="card" style="margin-top:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 style="margin:0">📆 Fällig diesen Monat (Abos)</h3>
+      <small class="muted" id="monthLabel"></small>
+    </div>
+    <div id="dueList"></div>
+  </div>
+
+  <script>
+    // ---- Helpers
+    function safeNum(n) { const x = Number(n); return Number.isFinite(x) ? x : 0; }
+    function monthPrefix(d = new Date()) { const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); return `${y}-${m}`; }
+    function formatEUR(n) { return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(n) || 0); }
+
+    // ---- Backup Export
+    function exportBackup() {
+      const payload = {
+        leadList: getLeads(),
+        customerDataList: getCustomers(),
+        counters: JSON.parse(localStorage.getItem('counters') || "{}"),
+        exportedAt: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `miniCRM_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    // ---- Backup Import
+    async function importBackup() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'application/json';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const text = await file.text();
+        try {
+          const data = JSON.parse(text);
+          if (data.leadList && data.customerDataList) {
+            localStorage.setItem('leadList', JSON.stringify(data.leadList));
+            localStorage.setItem('customerDataList', JSON.stringify(data.customerDataList));
+            if (data.counters) localStorage.setItem('counters', JSON.stringify(data.counters));
+            alert("Backup importiert. Seite wird neu geladen.");
+            location.reload();
+          } else {
+            alert("Ungültiges Backup-Format!");
+          }
+        } catch (err) {
+          alert("Fehler beim Einlesen: " + err.message);
+        }
+      };
+      input.click();
+    }
+
+    // ---- KPIs laden
+    const leads = getLeads();
+    const customers = getCustomers();
+
+    let openInvoicesCount = 0;
+    let activeSubsCount = 0;
+    let mrr = 0;
+
+    customers.forEach(c => {
+      (c.invoices || []).forEach(inv => {
+        if ((inv.status || 'offen') !== 'bezahlt') openInvoicesCount++;
+      });
+      (c.subscriptions || []).forEach(s => {
+        if (s.active) { activeSubsCount++; mrr += safeNum(s.amount); }
+      });
+    });
+
+    document.getElementById('kpiLeads').textContent = leads.length;
+    document.getElementById('kpiCustomers').textContent = customers.length;
+    document.getElementById('kpiInvoicesOpen').textContent = openInvoicesCount;
+    document.getElementById('kpiSubs').textContent = activeSubsCount;
+    document.getElementById('kpiMRR').textContent = formatEUR(mrr);
+
+    // ---- Bezahlt (30 Tage) – Summe + Toggle-Liste
+    function sumPaidLast30Days() {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      let total = 0;
+      customers.forEach(c => {
+        (c.invoices || []).forEach(inv => {
+          if (inv.status === "bezahlt") {
+            const when = new Date(inv.paidAt || inv.createdAt);
+            if (!isNaN(when) && when >= cutoff) {
+              total += Number(inv.amount) || 0;
+            }
+          }
+        });
+      });
+      return total;
+    }
+    document.getElementById("paid30").textContent = formatEUR(sumPaidLast30Days());
+
+    function getPaidLast30DaysList() {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      const list = [];
+      customers.forEach(c => {
+        (c.invoices || []).forEach(inv => {
+          if (inv.status === "bezahlt") {
+            const when = new Date(inv.paidAt || inv.createdAt);
+            if (!isNaN(when) && when >= cutoff) {
+              list.push({
+                customer: `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+                title: inv.title,
+                date: when.toISOString().slice(0, 10),
+                amount: Number(inv.amount) || 0
+              });
+            }
+          }
+        });
+      });
+      return list.sort((a, b) => b.date.localeCompare(a.date)); // neueste zuerst
+    }
+
+    let paid30Visible = false;
+    function togglePaid30() {
+      const box = document.getElementById("paid30List");
+      paid30Visible = !paid30Visible;
+      if (!paid30Visible) {
+        box.style.display = "none";
+        box.innerHTML = "";
+        return;
+      }
+      const data = getPaidLast30DaysList();
+      if (data.length === 0) {
+        box.innerHTML = `<div class="empty">Keine Zahlungen in den letzten 30 Tagen.</div>`;
+      } else {
+        const tbl = document.createElement("table");
+        tbl.innerHTML = `
+          <thead>
+            <tr>
+              <th>Kunde</th>
+              <th>Titel</th>
+              <th>Datum</th>
+              <th class="right">Betrag</th>
+            </tr>
+          </thead>
+          <tbody></tbody>`;
+        const tbody = tbl.querySelector("tbody");
+        data.forEach(row => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${row.customer}</td>
+            <td>${row.title || ""}</td>
+            <td>${row.date}</td>
+            <td class="right">${formatEUR(row.amount)}</td>`;
+          tbody.appendChild(tr);
+        });
+        box.replaceChildren(tbl);
+      }
+      box.style.display = "block";
+    }
+
+    // ---- Fällige Abos (dieser Monat)
+    const mm = monthPrefix();
+    document.getElementById('monthLabel').textContent = `Monat: ${mm}`;
+    const due = [];
+    customers.forEach(c => {
+      (c.subscriptions || []).forEach(s => {
+        if (s.active && typeof s.nextDue === 'string' && s.nextDue.slice(0, 7) === mm) {
+          due.push({
+            cid: c.id, sid: s.id,
+            customer: `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+            title: s.title, date: s.nextDue, amount: safeNum(s.amount)
+          });
+        }
+      });
+    });
+
+    const dueList = document.getElementById('dueList');
+    if (due.length === 0) {
+      dueList.innerHTML = `<div class="empty">Keine fälligen Abo-Rechnungen in diesem Monat.</div>`;
+    } else {
+      const tbl = document.createElement('table');
+      tbl.innerHTML = `
+        <thead>
+          <tr>
+            <th>Kunde</th>
+            <th>Leistung</th>
+            <th>Fälligkeit</th>
+            <th class="right">Betrag</th>
+            <th>Aktion</th>
+          </tr>
+        </thead>
+        <tbody></tbody>`;
+      const tbody = tbl.querySelector('tbody');
+      due.sort((a, b) => a.date.localeCompare(b.date));
+      due.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${row.customer}</td>
+          <td>${row.title}</td>
+          <td>${row.date}</td>
+          <td class="right">${formatEUR(row.amount)}</td>
+          <td>
+            <a class="btn" href="./invoice/sub_bill.html?cid=${encodeURIComponent(row.cid)}&sid=${encodeURIComponent(row.sid)}">
+              Rechnung erzeugen
+            </a>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      dueList.replaceChildren(tbl);
+    }
+  </script>
+</body>
+
+</html>
