@@ -1,0 +1,4 @@
+title,label,body,priority,milestone
+Set up GitHub Pages,ci,Publish static app5 to Pages via Actions,High,Sprint 1
+Implement storage interface,core,Abstract local storage into a single module with CRUD,High,Sprint 1
+Validation & form UX,ux,Add input validation + error states,High,Sprint 1
